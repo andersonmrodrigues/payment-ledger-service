@@ -19,7 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.TestPropertySource;
 
 /** One payment through every part of the service, over HTTP, with the relay on its schedule. */
-@TestPropertySource(properties = {"outbox.relay.enabled=true", "outbox.relay.poll-interval=100ms"})
+@TestPropertySource(properties = {"scheduling.enabled=true", "outbox.relay.poll-interval=100ms"})
 class PaymentLedgerFlowE2E extends IntegrationTest {
 
   @Test

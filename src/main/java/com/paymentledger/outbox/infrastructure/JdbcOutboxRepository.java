@@ -44,36 +44,49 @@ class JdbcOutboxRepository implements OutboxRepository {
   }
 
   @Override
-  public List<OutboxEvent> claimDue(Instant now, int limit) {
+  public List<OutboxEvent> claimDue(Instant now, Instant leaseUntil, UUID lease, int limit) {
+    // one statement, so the row locks last only as long as it does
     return jdbc.sql(
             """
-            select * from outbox_events
-            where status = 'PENDING' and next_attempt_at <= ?
-            order by position
-            limit ?
-            for update skip locked
+            with due as (
+                select id from outbox_events
+                where status = 'PENDING' and next_attempt_at <= ?
+                order by position
+                limit ?
+                for update skip locked
+            ), claimed as (
+                update outbox_events o
+                set next_attempt_at = ?, lease_token = ?
+                from due
+                where o.id = due.id
+                returning o.*
+            )
+            select * from claimed order by position
             """)
-        .params(Timestamp.from(now), limit)
+        .params(Timestamp.from(now), limit, Timestamp.from(leaseUntil), lease)
         .query(JdbcOutboxRepository::map)
         .list();
   }
 
   @Override
-  public void update(OutboxEvent event) {
-    jdbc.sql(
-            """
-            update outbox_events
-            set status = ?, attempts = ?, next_attempt_at = ?, last_error = ?, published_at = ?
-            where id = ?
-            """)
-        .params(
-            event.status().name(),
-            event.attempts(),
-            Timestamp.from(event.nextAttemptAt()),
-            event.lastError(),
-            event.publishedAt() == null ? null : Timestamp.from(event.publishedAt()),
-            event.id())
-        .update();
+  public boolean complete(OutboxEvent outcome, UUID lease) {
+    return jdbc.sql(
+                """
+                update outbox_events
+                set status = ?, attempts = ?, next_attempt_at = ?, last_error = ?,
+                    published_at = ?, lease_token = null
+                where id = ? and lease_token = ?
+                """)
+            .params(
+                outcome.status().name(),
+                outcome.attempts(),
+                Timestamp.from(outcome.nextAttemptAt()),
+                outcome.lastError(),
+                outcome.publishedAt() == null ? null : Timestamp.from(outcome.publishedAt()),
+                outcome.id(),
+                lease)
+            .update()
+        == 1;
   }
 
   @Override
@@ -90,11 +103,25 @@ class JdbcOutboxRepository implements OutboxRepository {
         .update();
   }
 
+  @Override
+  public int deletePublishedBefore(Instant cutoff, int limit) {
+    return jdbc.sql(
+            """
+            delete from outbox_events
+            where id in (
+                select id from outbox_events
+                where status = 'PUBLISHED' and published_at < ?
+                limit ?)
+            """)
+        .params(Timestamp.from(cutoff), limit)
+        .update();
+  }
+
   private static final String REQUEUE =
       """
       update outbox_events
       set status = 'PENDING', attempts = 0, next_attempt_at = ?, last_error = null,
-          published_at = null
+          published_at = null, lease_token = null
       """;
 
   private static OutboxEvent map(ResultSet rs, int row) throws SQLException {

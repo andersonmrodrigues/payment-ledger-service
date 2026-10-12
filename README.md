@@ -128,11 +128,14 @@ cannot break it.
 `PaymentCaptured` and `PaymentRefunded` are written in the same transaction as the payment and
 its journal entry. `OutboxRecorder` requires an active transaction and fails otherwise.
 
-The relay claims a batch with `FOR UPDATE SKIP LOCKED`, so any number of instances can run it.
-Each event's outcome is recorded on its own: a failed publish sets the next attempt with
-exponential backoff (1s doubling, capped at 5m) and, after `max-attempts`, marks the event
-`DEAD`. `LoggingEventPublisher` stands in for a broker. A Kafka or SNS adapter would implement
-`EventPublisher`.
+The relay leases a batch in one statement (`FOR UPDATE SKIP LOCKED`, then pushes the events'
+next attempt past `outbox.relay.lease` and stamps a lease token), so any number of instances can
+run it. It holds no transaction or row lock while it calls the broker. Each outcome is written on
+its own and only while the token still matches. If a relay dies mid-batch, its events go out
+when the lease runs out. A relay whose lease expired cannot overwrite what the next one
+recorded. A failed publish sets the next attempt with exponential backoff (1s doubling, capped
+at 5m). After `max-attempts` the event becomes `DEAD`. `LoggingEventPublisher` stands in for
+a broker. A Kafka or SNS adapter would implement `EventPublisher`.
 
 Delivery is **at least once**: a crash between publish and commit sends the event again, with
 the same id. Consumers must deduplicate on the event id. Events go out in the order they were
@@ -171,10 +174,16 @@ Every run and its discrepancies are stored for audit.
 
 - **Alerts.** `outbox_events{status="DEAD"} > 0` means events were given up on. Fix the cause,
   then replay them. A growing `PENDING` count means the relay or the broker is behind.
-- **Retention.** Published outbox events and idempotency keys are never deleted. Schedule a
-  cleanup that matches how long clients may retry and how far back replays should reach.
-- **Relay transactions.** A batch's row locks are held while it publishes. Keep
-  `outbox.relay.batch-size` small enough that a slow broker doesn't hold them for long.
+- **Retention.** Daily jobs delete published outbox events after `outbox.retention.period`
+  (30 days, which is also how far back a replay can reach) and idempotency keys after
+  `idempotency.retention.period` (7 days, how long clients may retry with a key). Dead events
+  are kept. A capture retried after its key is forgotten still gets `409`, because the PSP
+  reference is unique.
+- **Relay lease.** `outbox.relay.lease` must exceed the time to publish a whole batch. A shorter
+  lease makes another relay send the batch again. That is still at-least-once, but it is
+  wasted work.
+- **Dedicated relays.** `outbox.relay.enabled=false` keeps an instance from relaying.
+  `scheduling.enabled=false` turns off every background job.
 - **Access.** There is no authentication. `/outbox/replay` and `/reconciliations` are back
   office operations. Put them behind your gateway's auth before exposing the service.
 

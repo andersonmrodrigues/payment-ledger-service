@@ -38,7 +38,19 @@ outbox:
     enabled: true
     poll-interval: 1s
     batch-size: 100
+    lease: 60s
   retry:
     base-delay: 1s
     max-delay: 5m
     max-attempts: 10
+  retention:
+    period: 30d
+    batch-size: 5000
+    cron: "0 30 3 * * *"
+
+idempotency:
+  # Clients may retry with the same key for this long.
+  retention:
+    period: 7d
+    batch-size: 5000
+    cron: "0 45 3 * * *"

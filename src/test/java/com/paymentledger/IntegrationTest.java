@@ -13,7 +13,13 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {"outbox.relay.enabled=false", "outbox.retry.max-attempts=3"})
+    properties = {
+      "scheduling.enabled=false",
+      "outbox.retry.max-attempts=3",
+      // tiny batches so retention tests go through the batching loop
+      "outbox.retention.batch-size=2",
+      "idempotency.retention.batch-size=2"
+    })
 @Import(TestcontainersConfiguration.class)
 public abstract class IntegrationTest {
 

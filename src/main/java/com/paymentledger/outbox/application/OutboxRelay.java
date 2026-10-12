@@ -5,15 +5,21 @@ import com.paymentledger.outbox.domain.OutboxEvent;
 import com.paymentledger.outbox.domain.OutboxRepository;
 import com.paymentledger.outbox.domain.RetryPolicy;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Publishes due events one batch at a time. Each event's outcome is recorded on its own, so one
- * failing event neither blocks nor rolls back the others in the batch.
+ * Publishes due events one batch at a time.
+ *
+ * <p>No transaction or row lock is held while the broker is called: the batch is leased in one
+ * statement, published, and each outcome is written on its own. One failing event therefore neither
+ * blocks nor rolls back the others, and a relay that dies mid-batch only delays its events until
+ * the lease runs out.
  */
 @Service
 public class OutboxRelay {
@@ -24,6 +30,7 @@ public class OutboxRelay {
   private final EventPublisher publisher;
   private final RetryPolicy retryPolicy;
   private final int batchSize;
+  private final Duration lease;
   private final Clock clock;
 
   public OutboxRelay(
@@ -32,17 +39,23 @@ public class OutboxRelay {
     this.publisher = publisher;
     this.retryPolicy = properties.retryPolicy();
     this.batchSize = properties.relay().batchSize();
+    this.lease = properties.relay().lease();
     this.clock = clock;
   }
 
-  /** Returns how many events were handled, published or not. */
-  @Transactional
+  /** Returns how many events were claimed, published or not. */
   public int publishDue() {
-    List<OutboxEvent> due = outbox.claimDue(clock.instant(), batchSize);
-    for (OutboxEvent event : due) {
-      outbox.update(attempt(event));
+    Instant now = clock.instant();
+    UUID token = UUID.randomUUID();
+    List<OutboxEvent> claimed = outbox.claimDue(now, now.plus(lease), token, batchSize);
+    for (OutboxEvent event : claimed) {
+      if (!outbox.complete(attempt(event), token)) {
+        log.warn(
+            "Lease on event {} expired before its outcome was recorded; another relay owns it",
+            event.id());
+      }
     }
-    return due.size();
+    return claimed.size();
   }
 
   private OutboxEvent attempt(OutboxEvent event) {
