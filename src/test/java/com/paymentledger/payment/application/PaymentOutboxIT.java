@@ -29,7 +29,7 @@ class PaymentOutboxIT extends IntegrationTest {
     payments.refund(payment.id(), 2_500, "psp-r1");
 
     var events =
-        jdbc.sql("select event_type, payload from outbox_events order by created_at, event_type")
+        jdbc.sql("select event_type, payload from outbox_events order by position")
             .query((rs, n) -> new String[] {rs.getString(1), rs.getString(2)})
             .list();
     assertThat(events).extracting(e -> e[0]).containsExactly("PaymentCaptured", "PaymentRefunded");

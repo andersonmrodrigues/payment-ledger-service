@@ -38,6 +38,21 @@ class OutboxRelayIT extends IntegrationTest {
     ids.forEach(id -> assertThat(row(jdbc, id).status()).isEqualTo(OutboxStatus.PUBLISHED));
   }
 
+  /** The test clock is frozen, so every event here shares one created_at. */
+  @Test
+  void publishesInTheOrderEventsWereRecordedEvenWithEqualTimestamps() {
+    List<UUID> ids = record(20);
+
+    relay.publishDue();
+
+    assertThat(publisher.published()).extracting(OutboxEvent::id).containsExactlyElementsOf(ids);
+    assertThat(
+            jdbc.sql("select count(distinct created_at) from outbox_events")
+                .query(Long.class)
+                .single())
+        .isEqualTo(1);
+  }
+
   @Test
   void oneFailingEventDoesNotBlockTheRestOfItsBatch() {
     List<UUID> ids = record(3);
@@ -122,11 +137,8 @@ class OutboxRelayIT extends IntegrationTest {
     for (int i = 0; i < count; i++) {
       int n = i;
       tx.executeWithoutResult(status -> recorder.record("Test", UUID.randomUUID(), new Ping(n)));
-      // distinct creation times keep the publishing order deterministic
-      clock.advance(Duration.ofMillis(1));
     }
-    ids.addAll(
-        jdbc.sql("select id from outbox_events order by created_at").query(UUID.class).list());
+    ids.addAll(jdbc.sql("select id from outbox_events order by position").query(UUID.class).list());
     return ids;
   }
 }

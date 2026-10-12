@@ -49,7 +49,7 @@ class JdbcOutboxRepository implements OutboxRepository {
             """
             select * from outbox_events
             where status = 'PENDING' and next_attempt_at <= ?
-            order by created_at, id
+            order by position
             limit ?
             for update skip locked
             """)
