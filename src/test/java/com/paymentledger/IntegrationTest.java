@@ -3,15 +3,20 @@ package com.paymentledger;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
-/** Base for tests against a real PostgreSQL; every test starts from empty tables. */
-@SpringBootTest
+/**
+ * Base for tests against a real PostgreSQL and a running server; every test starts from empty
+ * tables.
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestcontainersConfiguration.class)
 public abstract class IntegrationTest {
 
   @Autowired protected JdbcClient jdbc;
+  @Autowired protected TestRestTemplate http;
 
   @BeforeEach
   void truncateTables() {

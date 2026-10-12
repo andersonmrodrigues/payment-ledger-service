@@ -40,8 +40,8 @@ class PaymentServiceIT extends IntegrationTest {
   void fullRefundReversesEveryBalance() {
     Payment payment = payments.capture("m1", Money.of(10_000, "BRL"), "psp-1");
 
-    payments.refund(payment.id(), Money.of(4_000, "BRL"), "psp-r1");
-    payments.refund(payment.id(), Money.of(6_000, "BRL"), "psp-r2");
+    payments.refund(payment.id(), 4_000, "psp-r1");
+    payments.refund(payment.id(), 6_000, "psp-r2");
 
     assertThat(payments.get(payment.id()).status()).isEqualTo(PaymentStatus.REFUNDED);
     assertThat(balance("PSP_CLEARING")).isZero();
@@ -63,7 +63,7 @@ class PaymentServiceIT extends IntegrationTest {
 
   @Test
   void rejectsARefundOfAnUnknownPayment() {
-    assertThatThrownBy(() -> payments.refund(UUID.randomUUID(), Money.of(1, "BRL"), "r"))
+    assertThatThrownBy(() -> payments.refund(UUID.randomUUID(), 1, "r"))
         .isInstanceOf(PaymentNotFoundException.class);
   }
 
@@ -84,7 +84,7 @@ class PaymentServiceIT extends IntegrationTest {
             pool.submit(
                 () -> {
                   start.await();
-                  return payments.refund(payment.id(), Money.of(3_000, "BRL"), reference);
+                  return payments.refund(payment.id(), 3_000, reference);
                 }));
       }
       start.countDown();

@@ -39,12 +39,14 @@ public class PaymentService {
     return payment;
   }
 
+  /** Refunds in the payment's own currency. */
   @Transactional
-  public Refund refund(UUID paymentId, Money amount, String pspReference) {
+  public Refund refund(UUID paymentId, long amountMinor, String pspReference) {
     Payment payment =
         payments
             .findByIdForUpdate(paymentId)
             .orElseThrow(() -> new PaymentNotFoundException(paymentId));
+    Money amount = new Money(amountMinor, payment.amount().currency());
     Refund refund = payment.refund(amount, pspReference, clock.instant());
     payments.addRefund(refund);
     bookkeeping.bookRefund(payment, refund);
