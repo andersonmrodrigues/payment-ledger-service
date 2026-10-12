@@ -80,7 +80,8 @@ class PaymentTest {
   @Test
   void roundedDownFeeSharesCatchUpBeforeTheMerchantIsOverdrawn() {
     // 50% fee on 4: each 1-unit refund's share is 0.5, which rounds down to 0.
-    Payment payment = Payment.capture("m1", Money.of(4, "BRL"), new FeePolicy(5_000), "p", NOW);
+    Payment payment =
+        Payment.capture("checkout", "m1", Money.of(4, "BRL"), new FeePolicy(5_000), "p", NOW);
 
     List<Long> returned = new ArrayList<>();
     for (int i = 0; i < 4; i++) {
@@ -98,7 +99,8 @@ class PaymentTest {
    */
   @Property
   void feeReturnIsExactAndNeverOverdrawsTheMerchant(@ForAll("refundPlans") RefundPlan plan) {
-    Payment payment = Payment.capture("m1", Money.of(plan.amount(), "BRL"), plan.fee(), "cap", NOW);
+    Payment payment =
+        Payment.capture("checkout", "m1", Money.of(plan.amount(), "BRL"), plan.fee(), "cap", NOW);
 
     for (long part : plan.parts()) {
       Refund refund = payment.refund(Money.of(part, "BRL"), "r" + part, NOW);
@@ -155,6 +157,6 @@ class PaymentTest {
   }
 
   private static Payment capture(long amount) {
-    return Payment.capture("m1", Money.of(amount, "BRL"), FEE, "psp-1", NOW);
+    return Payment.capture("checkout", "m1", Money.of(amount, "BRL"), FEE, "psp-1", NOW);
   }
 }

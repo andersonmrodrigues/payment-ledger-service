@@ -31,11 +31,13 @@ class JdbcPaymentRepository implements PaymentRepository {
       jdbc.sql(
               """
               insert into payments
-                (id, merchant_id, amount_minor, fee_minor, currency, psp_reference, captured_at)
-              values (?, ?, ?, ?, ?, ?, ?)
+                (id, client_id, merchant_id, amount_minor, fee_minor, currency, psp_reference,
+                 captured_at)
+              values (?, ?, ?, ?, ?, ?, ?, ?)
               """)
           .params(
               payment.id(),
+              payment.clientId(),
               payment.merchantId(),
               payment.amount().minorUnits(),
               payment.fee().minorUnits(),
@@ -89,6 +91,7 @@ class JdbcPaymentRepository implements PaymentRepository {
     Currency currency = Currency.getInstance(rs.getString("currency"));
     return new Payment(
         id,
+        rs.getString("client_id"),
         rs.getString("merchant_id"),
         new Money(rs.getLong("amount_minor"), currency),
         new Money(rs.getLong("fee_minor"), currency),

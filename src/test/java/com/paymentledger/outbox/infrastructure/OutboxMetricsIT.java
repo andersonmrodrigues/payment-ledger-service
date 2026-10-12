@@ -11,6 +11,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
+import org.springframework.boot.test.web.server.LocalManagementPort;
+import org.springframework.http.HttpStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 // Spring Boot tests leave metric exporters off unless asked
@@ -21,6 +23,7 @@ class OutboxMetricsIT extends IntegrationTest {
   @Autowired OutboxRelay relay;
   @Autowired TransactionTemplate tx;
   @Autowired MeterRegistry metrics;
+  @LocalManagementPort int managementPort;
 
   record Ping(int n) {}
 
@@ -43,10 +46,15 @@ class OutboxMetricsIT extends IntegrationTest {
   }
 
   @Test
-  void exposesHealthProbesAndPrometheusMetrics() {
-    assertThat(http.getForObject("/actuator/health/readiness", String.class)).contains("UP");
-    assertThat(http.getForObject("/actuator/prometheus", String.class))
+  void servesHealthProbesAndPrometheusMetricsOnTheManagementPortOnly() {
+    String management = "http://localhost:" + managementPort;
+
+    assertThat(anonymous.getForObject(management + "/actuator/health/readiness", String.class))
+        .contains("UP");
+    assertThat(anonymous.getForObject(management + "/actuator/prometheus", String.class))
         .contains("outbox_events{status=\"DEAD\"}");
+    assertThat(http.getForEntity("/actuator/prometheus", String.class).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
   }
 
   private double gauge(String status) {

@@ -53,7 +53,7 @@ class ShardedAccountsIT extends IntegrationTest {
               () ->
                   tx.executeWithoutResult(
                       status -> {
-                        payments.capture("m1", Money.of(10_000, "BRL"), "psp-held");
+                        payments.capture(CHECKOUT, "m1", Money.of(10_000, "BRL"), "psp-held");
                         holding.countDown();
                         awaitQuietly(release);
                       }));
@@ -62,7 +62,8 @@ class ShardedAccountsIT extends IntegrationTest {
       List<Future<?>> others = new ArrayList<>();
       for (int i = 0; i < 8; i++) {
         String reference = "psp-" + i;
-        others.add(pool.submit(() -> payments.capture("m1", Money.of(1_000, "BRL"), reference)));
+        others.add(
+            pool.submit(() -> payments.capture(CHECKOUT, "m1", Money.of(1_000, "BRL"), reference)));
       }
       try {
         await()
@@ -87,7 +88,7 @@ class ShardedAccountsIT extends IntegrationTest {
     PaymentService oneShard = withShards(1);
     Payment payment = captureOutsideShardZeroOf16(oneShard);
 
-    payments.refund(payment.id(), 10_000, "psp-refund");
+    payments.refund(CHECKOUT, payment.id(), 10_000, "psp-refund");
 
     assertLedgerConsistent(jdbc);
     assertThat(shardedBalance(jdbc, PaymentBookkeeping.PSP_CLEARING)).isZero();
@@ -125,7 +126,8 @@ class ShardedAccountsIT extends IntegrationTest {
       Payment payment =
           tx.execute(
               status -> {
-                Payment captured = service.capture("m1", Money.of(10_000, "BRL"), reference);
+                Payment captured =
+                    service.capture(CHECKOUT, "m1", Money.of(10_000, "BRL"), reference);
                 if (sixteen.code("X", captured.id()).equals("X#0")) {
                   status.setRollbackOnly();
                 }

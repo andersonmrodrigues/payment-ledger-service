@@ -38,20 +38,22 @@ public class PaymentService {
   }
 
   @Transactional
-  public Payment capture(String merchantId, Money amount, String pspReference) {
-    Payment payment = Payment.capture(merchantId, amount, feePolicy, pspReference, clock.instant());
+  public Payment capture(String clientId, String merchantId, Money amount, String pspReference) {
+    Payment payment =
+        Payment.capture(clientId, merchantId, amount, feePolicy, pspReference, clock.instant());
     payments.add(payment);
     bookkeeping.bookCapture(payment);
     outbox.record(PaymentEvents.AGGREGATE, payment.id(), PaymentCaptured.of(payment));
     return payment;
   }
 
-  /** Refunds in the payment's own currency. */
+  /** Refunds in the payment's own currency. Another client's payment is reported as not found. */
   @Transactional
-  public Refund refund(UUID paymentId, long amountMinor, String pspReference) {
+  public Refund refund(String clientId, UUID paymentId, long amountMinor, String pspReference) {
     Payment payment =
         payments
             .findByIdForUpdate(paymentId)
+            .filter(p -> p.belongsTo(clientId))
             .orElseThrow(() -> new PaymentNotFoundException(paymentId));
     Money amount = new Money(amountMinor, payment.amount().currency());
     Refund refund = payment.refund(amount, pspReference, clock.instant());
@@ -62,7 +64,10 @@ public class PaymentService {
   }
 
   @Transactional(readOnly = true)
-  public Payment get(UUID paymentId) {
-    return payments.findById(paymentId).orElseThrow(() -> new PaymentNotFoundException(paymentId));
+  public Payment get(String clientId, UUID paymentId) {
+    return payments
+        .findById(paymentId)
+        .filter(p -> p.belongsTo(clientId))
+        .orElseThrow(() -> new PaymentNotFoundException(paymentId));
   }
 }

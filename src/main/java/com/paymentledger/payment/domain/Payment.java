@@ -11,11 +11,13 @@ import java.util.UUID;
 
 /**
  * A captured payment and its refunds. Refunds never exceed the captured amount, and the fee is
- * returned pro rata so that a full refund returns exactly the fee that was kept.
+ * returned pro rata so that a full refund returns exactly the fee that was kept. A payment belongs
+ * to the API client that captured it.
  */
 public final class Payment {
 
   private final UUID id;
+  private final String clientId;
   private final String merchantId;
   private final Money amount;
   private final Money fee;
@@ -25,6 +27,7 @@ public final class Payment {
 
   public Payment(
       UUID id,
+      String clientId,
       String merchantId,
       Money amount,
       Money fee,
@@ -32,6 +35,7 @@ public final class Payment {
       Instant capturedAt,
       List<Refund> refunds) {
     this.id = Objects.requireNonNull(id, "id");
+    this.clientId = Objects.requireNonNull(clientId, "clientId");
     this.merchantId = Objects.requireNonNull(merchantId, "merchantId");
     this.amount = Objects.requireNonNull(amount, "amount");
     this.fee = Objects.requireNonNull(fee, "fee");
@@ -41,12 +45,18 @@ public final class Payment {
   }
 
   public static Payment capture(
-      String merchantId, Money amount, FeePolicy feePolicy, String pspReference, Instant now) {
+      String clientId,
+      String merchantId,
+      Money amount,
+      FeePolicy feePolicy,
+      String pspReference,
+      Instant now) {
     if (!amount.isPositive()) {
       throw new PaymentRuleViolationException("Captured amount must be positive");
     }
     return new Payment(
         UUID.randomUUID(),
+        clientId,
         merchantId,
         amount,
         feePolicy.feeFor(amount),
@@ -118,6 +128,14 @@ public final class Payment {
 
   public UUID id() {
     return id;
+  }
+
+  public String clientId() {
+    return clientId;
+  }
+
+  public boolean belongsTo(String client) {
+    return clientId.equals(client);
   }
 
   public String merchantId() {

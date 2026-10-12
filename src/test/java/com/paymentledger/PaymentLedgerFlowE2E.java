@@ -57,7 +57,7 @@ class PaymentLedgerFlowE2E extends IntegrationTest {
         re_1Pq7Ab,REFUND,5000,BRL,2026-10-12
         """;
     var reconciliation =
-        http.postForEntity(
+        backOffice.postForEntity(
             "/reconciliations?periodStart=2026-10-12&periodEnd=2026-10-13",
             statement(csv),
             ReconciliationResponse.class);

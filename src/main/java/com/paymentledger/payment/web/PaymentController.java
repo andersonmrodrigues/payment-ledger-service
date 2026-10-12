@@ -3,6 +3,7 @@ package com.paymentledger.payment.web;
 import com.paymentledger.idempotency.IdempotentExecutor;
 import com.paymentledger.idempotency.IdempotentResult;
 import com.paymentledger.payment.application.PaymentService;
+import com.paymentledger.security.ApiClient;
 import com.paymentledger.shared.domain.Money;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
@@ -10,6 +11,7 @@ import java.util.Currency;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,40 +38,46 @@ class PaymentController {
 
   @PostMapping
   ResponseEntity<PaymentResponse> capture(
+      @AuthenticationPrincipal ApiClient client,
       @RequestHeader(IDEMPOTENCY_KEY) @Size(min = 1, max = 255) String key,
       @Valid @RequestBody CapturePaymentRequest request) {
     Money amount = new Money(request.amountMinor(), currency(request.currency()));
     return created(
         idempotent.execute(
+            client.id(),
             "capture-payment",
             key,
             request,
             PaymentResponse.class,
             () ->
                 PaymentResponse.from(
-                    payments.capture(request.merchantId(), amount, request.pspReference()))));
+                    payments.capture(
+                        client.id(), request.merchantId(), amount, request.pspReference()))));
   }
 
   @PostMapping("/{paymentId}/refunds")
   ResponseEntity<RefundResponse> refund(
+      @AuthenticationPrincipal ApiClient client,
       @RequestHeader(IDEMPOTENCY_KEY) @Size(min = 1, max = 255) String key,
       @PathVariable UUID paymentId,
       @Valid @RequestBody RefundRequest request) {
     record Fingerprint(UUID paymentId, RefundRequest body) {}
     return created(
         idempotent.execute(
+            client.id(),
             "refund-payment",
             key,
             new Fingerprint(paymentId, request),
             RefundResponse.class,
             () ->
                 RefundResponse.from(
-                    payments.refund(paymentId, request.amountMinor(), request.pspReference()))));
+                    payments.refund(
+                        client.id(), paymentId, request.amountMinor(), request.pspReference()))));
   }
 
   @GetMapping("/{paymentId}")
-  PaymentResponse get(@PathVariable UUID paymentId) {
-    return PaymentResponse.from(payments.get(paymentId));
+  PaymentResponse get(@AuthenticationPrincipal ApiClient client, @PathVariable UUID paymentId) {
+    return PaymentResponse.from(payments.get(client.id(), paymentId));
   }
 
   private static <T> ResponseEntity<T> created(IdempotentResult<T> result) {

@@ -29,7 +29,7 @@ class PaymentServiceIT extends IntegrationTest {
 
   @Test
   void captureBooksClearingMerchantAndFee() {
-    payments.capture("m1", Money.of(10_000, "BRL"), "psp-1");
+    payments.capture(CHECKOUT, "m1", Money.of(10_000, "BRL"), "psp-1");
 
     assertThat(balance("PSP_CLEARING")).isEqualTo(10_000);
     assertThat(balance("MERCHANT_PAYABLE:m1")).isEqualTo(9_710);
@@ -39,12 +39,12 @@ class PaymentServiceIT extends IntegrationTest {
 
   @Test
   void fullRefundReversesEveryBalance() {
-    Payment payment = payments.capture("m1", Money.of(10_000, "BRL"), "psp-1");
+    Payment payment = payments.capture(CHECKOUT, "m1", Money.of(10_000, "BRL"), "psp-1");
 
-    payments.refund(payment.id(), 4_000, "psp-r1");
-    payments.refund(payment.id(), 6_000, "psp-r2");
+    payments.refund(CHECKOUT, payment.id(), 4_000, "psp-r1");
+    payments.refund(CHECKOUT, payment.id(), 6_000, "psp-r2");
 
-    assertThat(payments.get(payment.id()).status()).isEqualTo(PaymentStatus.REFUNDED);
+    assertThat(payments.get(CHECKOUT, payment.id()).status()).isEqualTo(PaymentStatus.REFUNDED);
     assertThat(balance("PSP_CLEARING")).isZero();
     assertThat(balance("MERCHANT_PAYABLE:m1")).isZero();
     assertThat(balance("FEE_REVENUE")).isZero();
@@ -53,9 +53,9 @@ class PaymentServiceIT extends IntegrationTest {
 
   @Test
   void rejectsAReusedPspReferenceWithoutBookingAnything() {
-    payments.capture("m1", Money.of(10_000, "BRL"), "psp-1");
+    payments.capture(CHECKOUT, "m1", Money.of(10_000, "BRL"), "psp-1");
 
-    assertThatThrownBy(() -> payments.capture("m1", Money.of(10_000, "BRL"), "psp-1"))
+    assertThatThrownBy(() -> payments.capture(CHECKOUT, "m1", Money.of(10_000, "BRL"), "psp-1"))
         .isInstanceOf(DuplicatePspReferenceException.class);
     assertThat(count("payments")).isEqualTo(1);
     assertThat(count("journal_entries")).isEqualTo(1);
@@ -64,7 +64,7 @@ class PaymentServiceIT extends IntegrationTest {
 
   @Test
   void rejectsARefundOfAnUnknownPayment() {
-    assertThatThrownBy(() -> payments.refund(UUID.randomUUID(), 1, "r"))
+    assertThatThrownBy(() -> payments.refund(CHECKOUT, UUID.randomUUID(), 1, "r"))
         .isInstanceOf(PaymentNotFoundException.class);
   }
 
@@ -74,7 +74,7 @@ class PaymentServiceIT extends IntegrationTest {
    */
   @Test
   void racingRefundsNeverExceedTheCapturedAmount() throws Exception {
-    Payment payment = payments.capture("m1", Money.of(10_000, "BRL"), "psp-1");
+    Payment payment = payments.capture(CHECKOUT, "m1", Money.of(10_000, "BRL"), "psp-1");
     int threads = 10;
     var start = new CountDownLatch(1);
     List<Future<?>> results = new ArrayList<>();
@@ -85,7 +85,7 @@ class PaymentServiceIT extends IntegrationTest {
             pool.submit(
                 () -> {
                   start.await();
-                  return payments.refund(payment.id(), 3_000, reference);
+                  return payments.refund(CHECKOUT, payment.id(), 3_000, reference);
                 }));
       }
       start.countDown();
@@ -101,7 +101,8 @@ class PaymentServiceIT extends IntegrationTest {
       }
     }
     assertThat(succeeded).isEqualTo(3);
-    assertThat(payments.get(payment.id()).refundedAmount()).isEqualTo(Money.of(9_000, "BRL"));
+    assertThat(payments.get(CHECKOUT, payment.id()).refundedAmount())
+        .isEqualTo(Money.of(9_000, "BRL"));
     assertThat(balance("PSP_CLEARING")).isEqualTo(1_000);
     assertLedgerConsistent(jdbc);
   }

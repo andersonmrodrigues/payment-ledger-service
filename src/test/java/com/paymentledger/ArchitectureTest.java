@@ -33,7 +33,8 @@ class ArchitectureTest {
               "com.paymentledger.payment..",
               "com.paymentledger.reconciliation..",
               "com.paymentledger.outbox..",
-              "com.paymentledger.idempotency..");
+              "com.paymentledger.idempotency..",
+              "com.paymentledger.security");
 
   @ArchTest
   static final ArchRule outboxDependsOnNoOtherContext =
@@ -46,7 +47,8 @@ class ArchitectureTest {
               "com.paymentledger.ledger..",
               "com.paymentledger.payment..",
               "com.paymentledger.reconciliation..",
-              "com.paymentledger.idempotency..");
+              "com.paymentledger.idempotency..",
+              "com.paymentledger.security");
 
   @ArchTest
   static final ArchRule idempotencyDependsOnNoContext =
@@ -59,7 +61,8 @@ class ArchitectureTest {
               "com.paymentledger.ledger..",
               "com.paymentledger.payment..",
               "com.paymentledger.reconciliation..",
-              "com.paymentledger.outbox..");
+              "com.paymentledger.outbox..",
+              "com.paymentledger.security");
 
   @ArchTest
   static final ArchRule paymentDoesNotDependOnReconciliation =
@@ -69,4 +72,27 @@ class ArchitectureTest {
           .should()
           .dependOnClassesThat()
           .resideInAPackage("com.paymentledger.reconciliation..");
+
+  @ArchTest
+  static final ArchRule onlyControllersSeeTheCaller =
+      noClasses()
+          .that()
+          .resideInAnyPackage("..domain..", "..application..", "..infrastructure..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAPackage("com.paymentledger.security..");
+
+  @ArchTest
+  static final ArchRule securityDependsOnNoContext =
+      noClasses()
+          .that()
+          .resideInAPackage("com.paymentledger.security..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage(
+              "com.paymentledger.ledger..",
+              "com.paymentledger.payment..",
+              "com.paymentledger.reconciliation..",
+              "com.paymentledger.outbox..",
+              "com.paymentledger.idempotency..");
 }

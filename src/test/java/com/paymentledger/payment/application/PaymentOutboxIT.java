@@ -25,8 +25,8 @@ class PaymentOutboxIT extends IntegrationTest {
 
   @Test
   void captureAndRefundEachRecordOneEvent() throws Exception {
-    Payment payment = payments.capture("m1", Money.of(10_000, "BRL"), "psp-1");
-    payments.refund(payment.id(), 2_500, "psp-r1");
+    Payment payment = payments.capture(CHECKOUT, "m1", Money.of(10_000, "BRL"), "psp-1");
+    payments.refund(CHECKOUT, payment.id(), 2_500, "psp-r1");
 
     var events =
         jdbc.sql("select event_type, payload from outbox_events order by position")
@@ -46,7 +46,7 @@ class PaymentOutboxIT extends IntegrationTest {
             () ->
                 tx.executeWithoutResult(
                     status -> {
-                      payments.capture("m1", Money.of(10_000, "BRL"), "psp-1");
+                      payments.capture(CHECKOUT, "m1", Money.of(10_000, "BRL"), "psp-1");
                       throw new IllegalStateException("crash before commit");
                     }))
         .hasMessage("crash before commit");

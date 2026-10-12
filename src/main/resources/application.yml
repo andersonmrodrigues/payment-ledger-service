@@ -20,6 +20,9 @@ spring:
       max-request-size: 20MB
 
 management:
+  # Health and metrics are unauthenticated, so they get their own port, kept off the public network.
+  server:
+    port: ${MANAGEMENT_PORT:8081}
   endpoints:
     web:
       exposure:
@@ -59,3 +62,11 @@ idempotency:
     period: 7d
     batch-size: 5000
     cron: "0 45 3 * * *"
+
+# API clients. Supply them from the environment or a secret store, for example
+#   SECURITY_CLIENTS_0_ID=checkout
+#   SECURITY_CLIENTS_0_KEY_SHA256=<hex SHA-256 of the key>[,<hash of the next key>]
+#   SECURITY_CLIENTS_0_ROLES=PAYMENTS
+# Roles: PAYMENTS (/payments) and BACK_OFFICE (/reconciliations, /outbox).
+security:
+  clients: []

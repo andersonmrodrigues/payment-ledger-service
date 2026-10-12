@@ -44,12 +44,12 @@ class ReconciliationApiIT extends IntegrationTest {
   @Test
   void reconcilesADayOfSettlements() {
     clock.advance(Duration.ofDays(-1));
-    payments.capture("m1", Money.of(4_000, "BRL"), "psp-yesterday");
+    payments.capture(CHECKOUT, "m1", Money.of(4_000, "BRL"), "psp-yesterday");
     clock.advance(Duration.ofDays(1));
-    Payment settled = payments.capture("m1", Money.of(10_000, "BRL"), "psp-1");
-    payments.refund(settled.id(), 2_500, "psp-r1");
-    payments.capture("m1", Money.of(5_000, "BRL"), "psp-unsettled");
-    payments.capture("m2", Money.of(7_000, "BRL"), "psp-short");
+    Payment settled = payments.capture(CHECKOUT, "m1", Money.of(10_000, "BRL"), "psp-1");
+    payments.refund(CHECKOUT, settled.id(), 2_500, "psp-r1");
+    payments.capture(CHECKOUT, "m1", Money.of(5_000, "BRL"), "psp-unsettled");
+    payments.capture(CHECKOUT, "m2", Money.of(7_000, "BRL"), "psp-short");
 
     var response =
         reconcile(
@@ -76,7 +76,8 @@ class ReconciliationApiIT extends IntegrationTest {
             tuple(MISSING_IN_STATEMENT, "psp-unsettled"));
     assertThat(response.getHeaders().getLocation()).hasPath("/reconciliations/" + report.id());
 
-    var stored = http.getForObject("/reconciliations/" + report.id(), ReconciliationResponse.class);
+    var stored =
+        backOffice.getForObject("/reconciliations/" + report.id(), ReconciliationResponse.class);
     assertThat(stored).isEqualTo(report);
   }
 
@@ -137,7 +138,8 @@ class ReconciliationApiIT extends IntegrationTest {
 
   @Test
   void anUnknownRunIsNotFound() {
-    var response = http.getForEntity("/reconciliations/" + UUID.randomUUID(), ProblemDetail.class);
+    var response =
+        backOffice.getForEntity("/reconciliations/" + UUID.randomUUID(), ProblemDetail.class);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
   }
@@ -147,20 +149,21 @@ class ReconciliationApiIT extends IntegrationTest {
     jdbc.sql(
             """
             insert into payments
-                (id, merchant_id, amount_minor, fee_minor, currency, psp_reference, captured_at)
-            values (?, 'm1', ?, 0, 'BRL', ?, ?)
+                (id, client_id, merchant_id, amount_minor, fee_minor, currency, psp_reference,
+                 captured_at)
+            values (?, ?, 'm1', ?, 0, 'BRL', ?, ?)
             """)
-        .params(id, amount, pspReference, Timestamp.from(clock.instant()))
+        .params(id, CHECKOUT, amount, pspReference, Timestamp.from(clock.instant()))
         .update();
     return id;
   }
 
   private ResponseEntity<ReconciliationResponse> reconcile(String csv, String start, String end) {
-    return http.postForEntity(uri(start, end), statement(csv), ReconciliationResponse.class);
+    return backOffice.postForEntity(uri(start, end), statement(csv), ReconciliationResponse.class);
   }
 
   private ResponseEntity<ProblemDetail> problem(String csv, String start, String end) {
-    return http.postForEntity(uri(start, end), statement(csv), ProblemDetail.class);
+    return backOffice.postForEntity(uri(start, end), statement(csv), ProblemDetail.class);
   }
 
   private static String uri(String start, String end) {

@@ -47,8 +47,9 @@ public class IdempotencyRetention {
           jdbc.sql(
                   """
                   delete from idempotency_keys
-                  where (scope, key) in (
-                      select scope, key from idempotency_keys where created_at < ? limit ?)
+                  where (client_id, scope, key) in (
+                      select client_id, scope, key from idempotency_keys
+                      where created_at < ? limit ?)
                   """)
               .params(Timestamp.from(cutoff), batchSize)
               .update();

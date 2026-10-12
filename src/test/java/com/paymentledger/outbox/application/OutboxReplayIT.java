@@ -86,11 +86,14 @@ class OutboxReplayIT extends IntegrationTest {
 
   @SuppressWarnings("unchecked")
   private Map<String, Object> replay(Map<String, ?> body) {
-    return http.postForObject("/outbox/replay", body, Map.class);
+    return backOffice.postForObject("/outbox/replay", body, Map.class);
   }
 
   private HttpStatus badReplay(Map<String, ?> body) {
     return HttpStatus.valueOf(
-        http.postForEntity("/outbox/replay", body, ProblemDetail.class).getStatusCode().value());
+        backOffice
+            .postForEntity("/outbox/replay", body, ProblemDetail.class)
+            .getStatusCode()
+            .value());
   }
 }

@@ -10,6 +10,10 @@ Java 21, Spring Boot 3.5, PostgreSQL 17, Flyway, plain JDBC (`JdbcClient`).
 
 ```bash
 docker compose up -d                       # PostgreSQL on localhost:5432
+
+API_KEY=$(openssl rand -hex 32)
+export SECURITY_CLIENTS_0_ID=checkout SECURITY_CLIENTS_0_ROLES=PAYMENTS,BACK_OFFICE
+export SECURITY_CLIENTS_0_KEY_SHA256=$(printf %s "$API_KEY" | shasum -a 256 | cut -d' ' -f1)
 DB_PASSWORD=payment_ledger ./scripts/mvn spring-boot:run
 ```
 
@@ -20,6 +24,8 @@ DB_PASSWORD=payment_ledger ./scripts/mvn spring-boot:run
 | `DB_URL` | `jdbc:postgresql://localhost:5432/payment_ledger` |
 | `DB_USERNAME` | `payment_ledger` |
 | `DB_PASSWORD` | empty |
+| `MANAGEMENT_PORT` | `8081` (health and metrics) |
+| `SECURITY_CLIENTS_<n>_ID`, `_KEY_SHA256`, `_ROLES` | none: every API call gets 401 |
 
 Other settings live in `application.yml`: the fee (`payment.fee-basis-points`, 290 = 2.90%),
 the relay (`outbox.relay.*`) and the retry policy (`outbox.retry.*`).
@@ -34,6 +40,12 @@ Integration tests need Docker; Testcontainers starts PostgreSQL. `./scripts/mvn 
 fixes formatting.
 
 ## API
+
+Every call carries `Authorization: Bearer <api key>` (left out below). A key belongs to one
+client, configured with the SHA-256 of the key and its roles: `PAYMENTS` for `/payments`,
+`BACK_OFFICE` for `/reconciliations` and `/outbox`. A client sees only its own payments, and its
+idempotency keys never collide with another client's. A client may list several hashes, so a key
+is rotated by adding the new one, moving callers over, then removing the old one.
 
 ```bash
 # capture
@@ -65,12 +77,14 @@ Amounts are always integer minor units (cents). Errors are RFC 9457 problem deta
 | Status | When |
 |---|---|
 | 400 | invalid body, header or period; malformed statement (the detail names the line) |
-| 404 | unknown payment or reconciliation |
+| 401 | missing, malformed or unknown API key |
+| 403 | the key's roles do not cover the endpoint |
+| 404 | unknown payment or reconciliation, or another client's payment |
 | 409 | PSP reference already used by another operation |
 | 422 | refund over the refundable amount; idempotency key reused with a different body |
 
-Operational endpoints: `/actuator/health/liveness`, `/actuator/health/readiness`,
-`/actuator/prometheus`.
+Operational endpoints, on the management port without authentication:
+`/actuator/health/liveness`, `/actuator/health/readiness`, `/actuator/prometheus`.
 
 ## Design
 
@@ -83,6 +97,7 @@ payment ──> ledger
    │
    └──────> outbox            reconciliation ──> payment, ledger
 idempotency (used by web only)
+security (the caller; seen by controllers only)
 ```
 
 ### Ledger
@@ -126,9 +141,9 @@ cannot break it.
 - Postings lock their accounts with `SELECT … FOR UPDATE`, always in id order, so concurrent
   transfers between the same accounts cannot deadlock.
 - A refund locks its payment row, so concurrent refunds see each other.
-- The idempotency key is inserted (`ON CONFLICT DO NOTHING`) in the same transaction as the
-  operation. A concurrent duplicate waits on that row and then returns the stored response
-  with `Idempotent-Replayed: true`. If the operation fails, the key goes with the rollback and
+- The idempotency key, unique per client, is inserted (`ON CONFLICT DO NOTHING`) in the same
+  transaction as the operation. A concurrent duplicate waits on that row and then returns the
+  stored response with `Idempotent-Replayed: true`. If the operation fails, the key goes with the rollback and
   the client can retry with it.
 
 ### Outbox
@@ -192,10 +207,12 @@ Every run and its discrepancies are stored for audit.
   wasted work.
 - **Dedicated relays.** `outbox.relay.enabled=false` keeps an instance from relaying.
   `scheduling.enabled=false` turns off every background job.
-- **Access.** There is no authentication. `/outbox/replay` and `/reconciliations` are back
-  office operations. Put them behind your gateway's auth before exposing the service.
+- **Access.** Generate keys with at least 256 bits of randomness and keep only their hashes in
+  configuration. Keep the management port off the public network: health and metrics there are
+  open. Keys are checked by the service itself, so it is safe behind a gateway or without one;
+  rate limiting is left to the gateway.
 
 ## Not included
 
-Currency conversion, merchant payouts, chargebacks, authentication, a real PSP or broker, and
+Currency conversion, merchant payouts, chargebacks, a real PSP or broker, rate limiting, and
 list or search endpoints.
