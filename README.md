@@ -88,17 +88,87 @@ Operational endpoints, on the management port without authentication:
 
 ## Design
 
+```mermaid
+graph TD
+    checkout["Checkout / merchant backend<br/>role PAYMENTS"]
+    backoffice["Back office<br/>role BACK_OFFICE"]
+    monitoring["Load balancer, Prometheus"]
+
+    subgraph service["payment-ledger-service"]
+        auth["API key filter<br/>Authorization: Bearer"]
+        payapi["/payments"]
+        reconapi["/reconciliations"]
+        outboxapi["/outbox/replay"]
+        mgmt["Management port 8081<br/>health, prometheus"]
+        idem["IdempotentExecutor"]
+        payments["PaymentService"]
+        bookkeeping["PaymentBookkeeping<br/>sharded accounts"]
+        ledger["LedgerService"]
+        recorder["OutboxRecorder"]
+        recon["ReconciliationService"]
+        relay["OutboxRelay<br/>lease, retry, DEAD"]
+        retention["Retention jobs"]
+    end
+
+    subgraph db["PostgreSQL"]
+        paytables[("payments, refunds")]
+        ledgertables[("accounts, journal_entries, postings")]
+        keys[("idempotency_keys")]
+        events[("outbox_events")]
+        runs[("reconciliation_runs")]
+    end
+
+    broker["Event broker"]
+
+    checkout --> auth
+    backoffice --> auth
+    monitoring --> mgmt
+    auth --> payapi
+    auth --> reconapi
+    auth --> outboxapi
+
+    payapi --> idem
+    idem --> payments
+    payments --> bookkeeping
+    bookkeeping --> ledger
+    payments --> recorder
+
+    idem -. same transaction .-> keys
+    payments -. same transaction .-> paytables
+    ledger -. same transaction .-> ledgertables
+    recorder -. same transaction .-> events
+
+    reconapi -- PSP statement CSV --> recon
+    recon --> paytables
+    recon --> ledgertables
+    recon --> runs
+
+    outboxapi --> events
+    relay -- claims due events --> events
+    relay -- at least once --> broker
+    retention --> events
+    retention --> keys
+```
+
+A capture or refund writes the idempotency key, the payment, its journal entry and its event in
+one transaction. The relay publishes the event later, and reconciliation checks the PSP
+statement against both the payments and the ledger.
+
 One package per bounded context, each split into `domain`, `application`, `infrastructure` and
 `web`. Domain code has no Spring or JDBC in it. `ArchitectureTest` enforces this and the
 direction of dependencies:
 
+```mermaid
+graph TD
+    payment --> ledger
+    payment --> outbox
+    reconciliation --> payment
+    reconciliation --> ledger
+    web["web controllers"] --> idempotency
+    web --> security
 ```
-payment ──> ledger
-   │
-   └──────> outbox            reconciliation ──> payment, ledger
-idempotency (used by web only)
-security (the caller; seen by controllers only)
-```
+
+`ledger`, `outbox`, `idempotency` and `security` depend on no other context.
 
 ### Ledger
 
