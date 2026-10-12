@@ -11,15 +11,21 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  * Base for tests against a real PostgreSQL and a running server; every test starts from empty
  * tables.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = {"outbox.relay.enabled=false", "outbox.retry.max-attempts=3"})
 @Import(TestcontainersConfiguration.class)
 public abstract class IntegrationTest {
 
   @Autowired protected JdbcClient jdbc;
   @Autowired protected TestRestTemplate http;
+  @Autowired protected MutableClock clock;
+  @Autowired protected RecordingEventPublisher publisher;
 
   @BeforeEach
-  void truncateTables() {
+  void resetState() {
+    clock.reset();
+    publisher.reset();
     // TRUNCATE bypasses the append-only row triggers, which is what a test reset needs.
     String tables =
         String.join(

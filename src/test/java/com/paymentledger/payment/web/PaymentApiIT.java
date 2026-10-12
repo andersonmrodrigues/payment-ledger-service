@@ -100,6 +100,7 @@ class PaymentApiIT extends IntegrationTest {
     assertThat(ids).hasSize(1);
     assertThat(count("payments")).isEqualTo(1);
     assertThat(count("journal_entries")).isEqualTo(1);
+    assertThat(count("outbox_events")).isEqualTo(1);
     assertLedgerConsistent(jdbc);
   }
 

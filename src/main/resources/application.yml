@@ -12,3 +12,13 @@ spring:
 payment:
   # Processing fee kept from each capture, in basis points (290 = 2.90%).
   fee-basis-points: 290
+
+outbox:
+  relay:
+    enabled: true
+    poll-interval: 1s
+    batch-size: 100
+  retry:
+    base-delay: 1s
+    max-delay: 5m
+    max-attempts: 10

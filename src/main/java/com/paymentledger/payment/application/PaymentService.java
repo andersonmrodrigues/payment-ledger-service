@@ -1,5 +1,8 @@
 package com.paymentledger.payment.application;
 
+import com.paymentledger.outbox.application.OutboxRecorder;
+import com.paymentledger.payment.application.PaymentEvents.PaymentCaptured;
+import com.paymentledger.payment.application.PaymentEvents.PaymentRefunded;
 import com.paymentledger.payment.domain.FeePolicy;
 import com.paymentledger.payment.domain.Payment;
 import com.paymentledger.payment.domain.PaymentNotFoundException;
@@ -17,16 +20,19 @@ public class PaymentService {
 
   private final PaymentRepository payments;
   private final PaymentBookkeeping bookkeeping;
+  private final OutboxRecorder outbox;
   private final FeePolicy feePolicy;
   private final Clock clock;
 
   public PaymentService(
       PaymentRepository payments,
       PaymentBookkeeping bookkeeping,
+      OutboxRecorder outbox,
       @Value("${payment.fee-basis-points}") int feeBasisPoints,
       Clock clock) {
     this.payments = payments;
     this.bookkeeping = bookkeeping;
+    this.outbox = outbox;
     this.feePolicy = new FeePolicy(feeBasisPoints);
     this.clock = clock;
   }
@@ -36,6 +42,7 @@ public class PaymentService {
     Payment payment = Payment.capture(merchantId, amount, feePolicy, pspReference, clock.instant());
     payments.add(payment);
     bookkeeping.bookCapture(payment);
+    outbox.record(PaymentEvents.AGGREGATE, payment.id(), PaymentCaptured.of(payment));
     return payment;
   }
 
@@ -50,6 +57,7 @@ public class PaymentService {
     Refund refund = payment.refund(amount, pspReference, clock.instant());
     payments.addRefund(refund);
     bookkeeping.bookRefund(payment, refund);
+    outbox.record(PaymentEvents.AGGREGATE, payment.id(), PaymentRefunded.of(payment, refund));
     return refund;
   }
 
