@@ -1,0 +1,15 @@
+# Local database for running the service; tests start their own with Testcontainers.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: payment_ledger
+      POSTGRES_USER: payment_ledger
+      POSTGRES_PASSWORD: payment_ledger
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:

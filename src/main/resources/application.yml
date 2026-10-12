@@ -1,6 +1,11 @@
+server:
+  shutdown: graceful
+
 spring:
   application:
     name: payment-ledger-service
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/payment_ledger}
     username: ${DB_USERNAME:payment_ledger}
@@ -13,6 +18,16 @@ spring:
       # PSP statements are uploaded whole; a month of a busy merchant fits well within this.
       max-file-size: 20MB
       max-request-size: 20MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
 
 payment:
   # Processing fee kept from each capture, in basis points (290 = 2.90%).
