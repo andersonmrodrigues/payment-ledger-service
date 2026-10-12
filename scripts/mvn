@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+# Runs Maven on JDK 21 even when the shell's default JAVA_HOME points to an older JDK.
+set -eu
+if [ -x /usr/libexec/java_home ] && jdk21=$(/usr/libexec/java_home -v 21 2>/dev/null); then
+  JAVA_HOME=$jdk21
+  export JAVA_HOME
+fi
+exec mvn -B "$@"
