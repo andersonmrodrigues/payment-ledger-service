@@ -1,6 +1,7 @@
 package com.paymentledger.shared.web;
 
 import com.paymentledger.shared.domain.ConflictException;
+import com.paymentledger.shared.domain.InvalidInputException;
 import com.paymentledger.shared.domain.NotFoundException;
 import com.paymentledger.shared.domain.RuleViolationException;
 import org.springframework.http.HttpStatus;
@@ -12,6 +13,11 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 /** Maps domain failures to RFC 9457 problem responses. */
 @RestControllerAdvice
 class ApiExceptionHandler extends ResponseEntityExceptionHandler {
+
+  @ExceptionHandler
+  ProblemDetail invalidInput(InvalidInputException e) {
+    return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+  }
 
   @ExceptionHandler
   ProblemDetail notFound(NotFoundException e) {

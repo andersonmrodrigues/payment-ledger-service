@@ -22,6 +22,7 @@
     <archunit.version>1.4.1</archunit.version>
     <jqwik.version>1.9.3</jqwik.version>
     <spotless.version>2.46.1</spotless.version>
+    <commons-csv.version>1.14.1</commons-csv.version>
   </properties>
 
   <dependencies>
@@ -44,6 +45,11 @@
     <dependency>
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-csv</artifactId>
+      <version>${commons-csv.version}</version>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>

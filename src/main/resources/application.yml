@@ -8,6 +8,11 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  servlet:
+    multipart:
+      # PSP statements are uploaded whole; a month of a busy merchant fits well within this.
+      max-file-size: 20MB
+      max-request-size: 20MB
 
 payment:
   # Processing fee kept from each capture, in basis points (290 = 2.90%).
