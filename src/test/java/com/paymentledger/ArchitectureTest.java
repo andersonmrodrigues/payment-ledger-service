@@ -12,9 +12,6 @@ import com.tngtech.archunit.lang.ArchRule;
     importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
 
-  // allowEmptyShould is temporary: contexts are added phase by phase and the flag is removed once
-  // every rule has classes to check.
-
   @ArchTest
   static final ArchRule domainIsFrameworkFree =
       noClasses()
@@ -23,8 +20,7 @@ class ArchitectureTest {
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage(
-              "org.springframework..", "..infrastructure..", "..application..", "..web..")
-          .allowEmptyShould(true);
+              "org.springframework..", "..infrastructure..", "..application..", "..web..");
 
   @ArchTest
   static final ArchRule ledgerDependsOnNoOtherContext =
@@ -36,8 +32,8 @@ class ArchitectureTest {
           .resideInAnyPackage(
               "com.paymentledger.payment..",
               "com.paymentledger.reconciliation..",
-              "com.paymentledger.outbox..")
-          .allowEmptyShould(true);
+              "com.paymentledger.outbox..",
+              "com.paymentledger.idempotency..");
 
   @ArchTest
   static final ArchRule outboxDependsOnNoOtherContext =
@@ -49,8 +45,21 @@ class ArchitectureTest {
           .resideInAnyPackage(
               "com.paymentledger.ledger..",
               "com.paymentledger.payment..",
-              "com.paymentledger.reconciliation..")
-          .allowEmptyShould(true);
+              "com.paymentledger.reconciliation..",
+              "com.paymentledger.idempotency..");
+
+  @ArchTest
+  static final ArchRule idempotencyDependsOnNoContext =
+      noClasses()
+          .that()
+          .resideInAPackage("com.paymentledger.idempotency..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage(
+              "com.paymentledger.ledger..",
+              "com.paymentledger.payment..",
+              "com.paymentledger.reconciliation..",
+              "com.paymentledger.outbox..");
 
   @ArchTest
   static final ArchRule paymentDoesNotDependOnReconciliation =
@@ -59,6 +68,5 @@ class ArchitectureTest {
           .resideInAPackage("com.paymentledger.payment..")
           .should()
           .dependOnClassesThat()
-          .resideInAPackage("com.paymentledger.reconciliation..")
-          .allowEmptyShould(true);
+          .resideInAPackage("com.paymentledger.reconciliation..");
 }

@@ -6,6 +6,7 @@ import static com.paymentledger.reconciliation.domain.DiscrepancyType.LEDGER_MIS
 import static com.paymentledger.reconciliation.domain.DiscrepancyType.MISSING_IN_SERVICE;
 import static com.paymentledger.reconciliation.domain.DiscrepancyType.MISSING_IN_STATEMENT;
 import static com.paymentledger.reconciliation.domain.OperationType.CAPTURE;
+import static com.paymentledger.reconciliation.web.StatementUploads.statement;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
@@ -19,7 +20,6 @@ import com.paymentledger.payment.application.PaymentService;
 import com.paymentledger.payment.domain.Payment;
 import com.paymentledger.reconciliation.domain.Discrepancy;
 import com.paymentledger.shared.domain.Money;
-import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.Currency;
@@ -27,14 +27,9 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.LinkedMultiValueMap;
 
 class ReconciliationApiIT extends IntegrationTest {
 
@@ -159,30 +154,15 @@ class ReconciliationApiIT extends IntegrationTest {
   }
 
   private ResponseEntity<ReconciliationResponse> reconcile(String csv, String start, String end) {
-    return http.postForEntity(uri(start, end), upload(csv), ReconciliationResponse.class);
+    return http.postForEntity(uri(start, end), statement(csv), ReconciliationResponse.class);
   }
 
   private ResponseEntity<ProblemDetail> problem(String csv, String start, String end) {
-    return http.postForEntity(uri(start, end), upload(csv), ProblemDetail.class);
+    return http.postForEntity(uri(start, end), statement(csv), ProblemDetail.class);
   }
 
   private static String uri(String start, String end) {
     return "/reconciliations?periodStart=" + start + "&periodEnd=" + end;
-  }
-
-  private static HttpEntity<LinkedMultiValueMap<String, Object>> upload(String csv) {
-    var file =
-        new ByteArrayResource(csv.getBytes(StandardCharsets.UTF_8)) {
-          @Override
-          public String getFilename() {
-            return "statement.csv";
-          }
-        };
-    var body = new LinkedMultiValueMap<String, Object>();
-    body.add("statement", file);
-    var headers = new HttpHeaders();
-    headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-    return new HttpEntity<>(body, headers);
   }
 
   private long count(String table) {
