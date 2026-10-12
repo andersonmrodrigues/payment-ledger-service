@@ -8,3 +8,7 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+
+payment:
+  # Processing fee kept from each capture, in basis points (290 = 2.90%).
+  fee-basis-points: 290
