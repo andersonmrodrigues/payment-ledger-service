@@ -1,6 +1,7 @@
 package com.paymentledger;
 
 import static com.paymentledger.LedgerAssertions.assertLedgerConsistent;
+import static com.paymentledger.LedgerAssertions.shardedBalance;
 import static com.paymentledger.reconciliation.web.StatementUploads.statement;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -81,9 +82,6 @@ class PaymentLedgerFlowE2E extends IntegrationTest {
   }
 
   private long merchantPayable() {
-    return jdbc.sql(
-            "select balance_minor from accounts where code = 'MERCHANT_PAYABLE:merchant-42'")
-        .query(Long.class)
-        .single();
+    return shardedBalance(jdbc, "MERCHANT_PAYABLE:merchant-42");
   }
 }

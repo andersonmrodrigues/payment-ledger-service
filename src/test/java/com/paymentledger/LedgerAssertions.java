@@ -38,4 +38,13 @@ public final class LedgerAssertions {
             .listOfRows();
     assertThat(driftedAccounts).as("stored balance equals the sum of postings").isEmpty();
   }
+
+  /** The balance of an account split into shards: the sum over {@code <code>#<shard>}. */
+  public static long shardedBalance(JdbcClient jdbc, String code) {
+    return jdbc.sql(
+            "select coalesce(sum(balance_minor), 0) from accounts where starts_with(code, ? || '#')")
+        .param(code)
+        .query(Long.class)
+        .single();
+  }
 }

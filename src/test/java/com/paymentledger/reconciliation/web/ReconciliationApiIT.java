@@ -85,9 +85,11 @@ class ReconciliationApiIT extends IntegrationTest {
   void findsOperationsTheLedgerDoesNotBackUp() {
     insertPaymentWithoutBookkeeping("psp-unbooked", 3_000);
     UUID misbooked = insertPaymentWithoutBookkeeping("psp-misbooked", 3_000);
-    UUID clearing = ledger.accountId(PaymentBookkeeping.PSP_CLEARING, AccountType.ASSET, BRL);
+    UUID clearing =
+        ledger.accountId(PaymentBookkeeping.PSP_CLEARING + "#0", AccountType.ASSET, BRL);
     UUID payable =
-        ledger.accountId(PaymentBookkeeping.merchantPayableCode("m1"), AccountType.LIABILITY, BRL);
+        ledger.accountId(
+            PaymentBookkeeping.merchantPayableCode("m1") + "#0", AccountType.LIABILITY, BRL);
     ledger.post(
         new EntryReference(PaymentBookkeeping.CAPTURE, misbooked.toString()),
         List.of(

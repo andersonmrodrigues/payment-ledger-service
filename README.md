@@ -88,7 +88,8 @@ idempotency (used by web only)
 ### Ledger
 
 Accounts are created per currency on first use: `PSP_CLEARING` (asset, money the PSP owes us),
-`MERCHANT_PAYABLE:<merchantId>` (liability, money we owe the merchant) and `FEE_REVENUE`.
+`MERCHANT_PAYABLE:<merchantId>` (liability, money we owe the merchant) and `FEE_REVENUE`, each
+split into shards (below).
 
 | Operation | Debit | Credit |
 |---|---|---|
@@ -97,6 +98,13 @@ Accounts are created per currency on first use: `PSP_CLEARING` (asset, money the
 
 The fee is returned pro rata on each refund, rounded half-even, and clamped so the merchant is
 never charged more fee than the amount left. After a full refund every account returns to zero.
+
+**Hot accounts.** Every capture touches clearing and fee revenue, and a large merchant's
+captures all touch its payable. A single row per account would make captures wait on each other.
+Each of these accounts is split into `ledger.account-shards` (16) accounts named `<code>#<n>`,
+picked from the payment id. A refund books on its capture's shards. An account's balance is the
+sum of its shards. Raising the shard count later keeps totals right, but refunds of older
+payments may land on other shards and leave a single shard negative.
 
 ### Invariants and where they hold
 

@@ -29,6 +29,11 @@ management:
       probes:
         enabled: true
 
+ledger:
+  # Clearing, fee revenue and each merchant payable are split into this many accounts so that
+  # concurrent captures do not queue on one row. Raising it later is safe for totals.
+  account-shards: 16
+
 payment:
   # Processing fee kept from each capture, in basis points (290 = 2.90%).
   fee-basis-points: 290

@@ -4,6 +4,7 @@ import static com.paymentledger.payment.application.PaymentBookkeeping.CAPTURE;
 import static com.paymentledger.payment.application.PaymentBookkeeping.PSP_CLEARING;
 import static com.paymentledger.payment.application.PaymentBookkeeping.REFUND;
 
+import com.paymentledger.ledger.domain.AccountShards;
 import com.paymentledger.reconciliation.domain.BookedOperation;
 import com.paymentledger.reconciliation.domain.BookedOperations;
 import com.paymentledger.reconciliation.domain.OperationKey;
@@ -50,7 +51,7 @@ class JdbcBookedOperations implements BookedOperations {
               join accounts a on a.id = po.account_id
               where je.reference_type = o.reference_type
                 and je.reference_id = o.reference_id
-                and a.code = :clearing) as clearing_minor
+                and starts_with(a.code, :clearingShards)) as clearing_minor
       from operations o
       """;
 
@@ -90,7 +91,13 @@ class JdbcBookedOperations implements BookedOperations {
   }
 
   private static Map<String, Object> ledgerReferences() {
-    return Map.of("capture", CAPTURE, "refund", REFUND, "clearing", PSP_CLEARING);
+    return Map.of(
+        "capture",
+        CAPTURE,
+        "refund",
+        REFUND,
+        "clearingShards",
+        PSP_CLEARING + AccountShards.SEPARATOR);
   }
 
   private static BookedOperation map(ResultSet rs, int row) throws SQLException {

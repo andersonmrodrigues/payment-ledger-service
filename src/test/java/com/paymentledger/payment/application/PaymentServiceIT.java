@@ -1,6 +1,7 @@
 package com.paymentledger.payment.application;
 
 import static com.paymentledger.LedgerAssertions.assertLedgerConsistent;
+import static com.paymentledger.LedgerAssertions.shardedBalance;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -106,10 +107,7 @@ class PaymentServiceIT extends IntegrationTest {
   }
 
   private long balance(String code) {
-    return jdbc.sql("select balance_minor from accounts where code = ?")
-        .param(code)
-        .query(Long.class)
-        .single();
+    return shardedBalance(jdbc, code);
   }
 
   private long count(String table) {
